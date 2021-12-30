@@ -1,0 +1,23 @@
+version: '3'
+services:
+  web:
+    image: ubuntu:latest
+    command: bash -c 'cd /srv && sleep 15 && ./dnslogger'
+    depends_on:
+      - db
+    restart: always
+    links:
+      - db:db
+    volumes:
+      - ./dnslogger:/srv/dnslogger
+      - ./config.default.ini:/srv/config.ini
+    ports:
+      - "53:53/udp"
+      - "1965:1965/tcp"
+  db:
+    image: mariadb:latest
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=dnslogger
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
