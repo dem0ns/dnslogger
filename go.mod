@@ -6,7 +6,6 @@ require (
 	github.com/gin-gonic/gin v1.7.7
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/miekg/dns v1.1.45
-	gopkg.in/ini.v1 v1.66.2
 )
 
 require (
@@ -27,7 +26,5 @@ require (
 	golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c // indirect
 	golang.org/x/tools v0.1.6-0.20210726203631-07bc1bf47fb2 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
-	google.golang.org/appengine v1.6.5 // indirect
-	gopkg.in/go-playground/validator.v9 v9.29.1 // indirect
 	gopkg.in/yaml.v2 v2.2.8 // indirect
 )
