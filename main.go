@@ -18,7 +18,7 @@ import (
 
 var db *sql.DB
 
-const TIME_LAYOUT = "2006-01-02 15:04:05"
+const TimeLayout = "2006-01-02 15:04:05"
 
 type DNS struct {
 	Id      int
@@ -95,7 +95,7 @@ func loadConfig() {
 func saveDatabase(record DNS) bool {
 	_, err := db.Exec("INSERT INTO `dnslog` (`domain`, `type`, `resp`, `src`, `created_at`) VALUES (?, ?, ?, ?, ?)", &record.Domain, &record.Type, &record.Resp, &record.Src, &record.Created)
 	checkErrWarmly(err)
-	fmt.Println("[+] " + record.Domain + " from " + record.Src + " -> response " + record.Resp)
+	fmt.Printf("[+] REQ [%s] FROM [%s] RESP [%s]\n", record.Domain, record.Src, record.Resp)
 	return true
 }
 
@@ -126,7 +126,6 @@ func (this *handler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 }
 
 func main() {
-
 	fmt.Println("[+] Hello from DNSLogger")
 	fmt.Println("[+] Starting...")
 	loadConfig()
@@ -185,7 +184,7 @@ func httpServer() {
 			var d DNS
 			var timeCreated string
 			err = rows.Scan(&d.Id, &d.Domain, &d.Type, &d.Resp, &d.Src, &timeCreated)
-			d.Created, _ = time.Parse(TIME_LAYOUT, timeCreated)
+			d.Created, _ = time.Parse(TimeLayout, timeCreated)
 			logs = append(logs, d)
 		}
 		c.JSON(http.StatusOK, gin.H{
@@ -200,7 +199,7 @@ func httpServer() {
 			m, _ := time.ParseDuration("-5m")
 			var timeCreated string
 			err := db.QueryRow("SELECT `id`, `domain`,`type`,`resp`,`src`,datetime(created_at) FROM dnslog WHERE `domain` = ? and `created_at` >= ? LIMIT 1", query.Domain, time.Now().Add(m)).Scan(&d.Id, &d.Domain, &d.Type, &d.Resp, &d.Src, &timeCreated)
-			d.Created, _ = time.Parse(TIME_LAYOUT, timeCreated)
+			d.Created, _ = time.Parse(TimeLayout, timeCreated)
 			if err != nil {
 				checkErrWarmly(err)
 				c.JSON(http.StatusNoContent, gin.H{
