@@ -2,7 +2,7 @@
 
 ### 适用场景
 
-自建DNSLog
+自建DNSLog平台。
 
 ![Running](./images/running.jpg)
 
