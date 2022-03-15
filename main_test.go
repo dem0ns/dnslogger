@@ -16,7 +16,7 @@ func TestMain(m *testing.M) {
 
 func TestDNS(t *testing.T) {
 	t.Run("req", func(t *testing.T) {
-		ns := "localhost:53"
+		ns := "127.0.0.1:53"
 		c := dns.Client{}
 		m := dns.Msg{}
 		m.SetQuestion("dnslogger.local.", dns.TypeA)
