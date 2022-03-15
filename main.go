@@ -145,7 +145,7 @@ func main() {
 	check()
 	go httpServer()
 	fmt.Println("[+] Server Started!")
-	listenAddr := fmt.Sprintf(":%s", strconv.Itoa(53))
+	listenAddr := fmt.Sprintf("0.0.0.0:%s", strconv.Itoa(53))
 	srv := &dns.Server{Addr: listenAddr, Net: "udp"}
 	srv.Handler = &handler{}
 	if err := srv.ListenAndServe(); err != nil {
