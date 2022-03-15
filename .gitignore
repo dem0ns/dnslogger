@@ -3,5 +3,4 @@ config.ini
 .idea
 !.gitignore
 vendor
-*.sum
 dnslogger
