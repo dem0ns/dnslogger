@@ -4,7 +4,6 @@ go 1.17
 
 require (
 	github.com/gin-gonic/gin v1.7.7
-	github.com/go-sql-driver/mysql v1.6.0
 	github.com/mattn/go-sqlite3 v1.14.12
 	github.com/miekg/dns v1.1.45
 	gopkg.in/ini.v1 v1.66.2
