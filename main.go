@@ -30,9 +30,9 @@ type DNS struct {
 }
 
 type Config struct {
-	Conn      string
 	DefaultIp string
 	DbPath    string
+	HttpPort  uint16
 }
 
 type Query struct {
@@ -85,10 +85,14 @@ func getConfig(str string) string {
 	return value.String()
 }
 
-func loadConfig() {
+func LoadConfig() {
 	fmt.Println("[*] 加载配置文件...")
 	config.DefaultIp = getConfig("default_ip")
 	config.DbPath = getConfig("db_file")
+	port, err := strconv.ParseInt(getConfig("http_port"), 10, 16)
+	checkErr(err)
+	config.HttpPort = uint16(port)
+	fmt.Printf("[*] HTTP API端口: %d\n", port)
 	fmt.Println("[*] 配置文件加载完毕")
 }
 
@@ -128,7 +132,7 @@ func (this *handler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 func main() {
 	fmt.Println("[+] Hello from DNSLogger")
 	fmt.Println("[+] Starting...")
-	loadConfig()
+	LoadConfig()
 	var err error
 	db, err = sql.Open("sqlite3", config.DbPath)
 	checkErr(err)
@@ -141,8 +145,8 @@ func main() {
 	check()
 	go httpServer()
 	fmt.Println("[+] Server Started!")
-
-	srv := &dns.Server{Addr: ":" + strconv.Itoa(53), Net: "udp"}
+	listenAddr := fmt.Sprintf(":%s", strconv.Itoa(53))
+	srv := &dns.Server{Addr: listenAddr, Net: "udp"}
 	srv.Handler = &handler{}
 	if err := srv.ListenAndServe(); err != nil {
 		log.Fatalf("Failed to set udp listener %s\n", err.Error())
@@ -163,7 +167,6 @@ func check() {
 		checkErr(err)
 		fmt.Println("[*] 数据库初始化完毕")
 	}
-
 	fmt.Println("[*] 数据库检查完毕")
 }
 
@@ -217,5 +220,7 @@ func httpServer() {
 			"msg":    "Wrong 🐖",
 		})
 	})
-	_ = r.Run("127.0.0.1:1965")
+	listenAddr := fmt.Sprintf("127.0.0.1:%d", config.HttpPort)
+	fmt.Printf("[*] HTTP API: %s\n", listenAddr)
+	_ = r.Run(listenAddr)
 }

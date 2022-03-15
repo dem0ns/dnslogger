@@ -3,8 +3,6 @@ services:
   web:
     image: ubuntu:latest
     command: bash -c 'cd /srv && ./dnslogger'
-    depends_on:
-      - db
     restart: always
     volumes:
       - ./dnslogger:/srv/dnslogger
