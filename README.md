@@ -8,9 +8,9 @@
 
 ### 说明
 
-udp 53 DNS
+UDP 53 DNS
 
-tcp 1965 API
+TCP 1965 API
 
 API：
 
@@ -20,13 +20,20 @@ API：
 
 ### 测试
 
-`dig dnslogger.local @127.0.0.1`
+```
+# 发送DNS请求
+dig dnslogger.local @127.0.0.1
 
-`curl http://localhost:1965/api/latest -v`
+# 查询最新的5条DNS请求
+curl http://localhost:1965/api/latest -v
 
-`curl http://localhost:1965/api/validate -d '{"domain":"dnslogger.local"}' -v`
+# 查询domain为dnslogger.local的请求（5分钟内）
+curl http://localhost:1965/api/validate -d '{"domain":"dnslogger.local"}' -v
+```
 
 ### 编译
+
+`go build`
 
 因采用了go-sqlite3组件，涉及到CGO，编译有问题请参考 https://github.com/mattn/go-sqlite3
 
