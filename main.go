@@ -162,8 +162,11 @@ func check() {
 	}(exec)
 	if !exec.Next() {
 		fmt.Println("[*] 数据库初始化中")
-		initSql := "create table dnslog_dg_tmp\n(\n    id         integer\n        constraint dnslog_pk\n            primary key autoincrement,\n    domain     text,\n    type       text,\n    resp       text,\n    src        text,\n    created_at text\n);\n\ninsert into dnslog_dg_tmp(id, domain, type, resp, src, created_at)\nselect id, domain, type, resp, src, created_at\nfrom dnslog;\n\ndrop table dnslog;\n\nalter table dnslog_dg_tmp\n    rename to dnslog;\n\ncreate index dnslog_domain_index\n    on dnslog (domain);\n\n"
+		initSql := "create table dnslog(id integer constraint dnslog_pk primary key autoincrement, domain text, type text, resp text, src text, created_at text);"
 		_, err := db.Exec(initSql)
+		checkErr(err)
+		initSql = "create index dnslog_domain_index on dnslog (domain);"
+		_, err = db.Exec(initSql)
 		checkErr(err)
 		fmt.Println("[*] 数据库初始化完毕")
 	}
