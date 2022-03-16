@@ -10,7 +10,7 @@ import (
 
 func TestMain(m *testing.M) {
 	go main()
-	time.Sleep(3)
+	time.Sleep(3 * time.Second)
 	_ = m.Run()
 }
 
