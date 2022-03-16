@@ -223,7 +223,7 @@ func httpServer() {
 			"msg":    "Wrong 🐖",
 		})
 	})
-	listenAddr := fmt.Sprintf("127.0.0.1:%d", config.HttpPort)
+	listenAddr := fmt.Sprintf("0.0.0.0:%d", config.HttpPort)
 	fmt.Printf("[*] HTTP API: %s\n", listenAddr)
 	_ = r.Run(listenAddr)
 }
