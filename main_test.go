@@ -23,12 +23,12 @@ func TestDNS(t *testing.T) {
 		r, _, err := c.Exchange(&m, ns)
 		checkErr(err)
 		for _, ans := range r.Answer {
-			if ans.(*dns.A).A.String() != config.DefaultIp {
+			if ans.(*dns.A).A.String() != config.ReturnIP {
 				t.Errorf("DNS解析错误.\n")
 			}
 		}
 	})
-	ApiBase := fmt.Sprintf("http://127.0.0.1:%d", config.HttpPort)
+	ApiBase := fmt.Sprintf("http://%s", config.ListenHttp)
 	t.Run("queryLatest", func(t *testing.T) {
 		reqest, err := http.NewRequest("GET", fmt.Sprintf("%s/api/latest", ApiBase), nil)
 		if err != nil {

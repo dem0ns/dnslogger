@@ -12,7 +12,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"strconv"
 	"time"
 )
 
@@ -30,9 +29,10 @@ type DNS struct {
 }
 
 type Config struct {
-	DefaultIp string
-	DbPath    string
-	HttpPort  uint16
+	ReturnIP   string
+	DbPath     string
+	ListenHttp string
+	ListenDNS  string
 }
 
 type Query struct {
@@ -87,12 +87,11 @@ func getConfig(str string) string {
 
 func LoadConfig() {
 	fmt.Println("[*] 加载配置文件...")
-	config.DefaultIp = getConfig("default_ip")
+	config.ReturnIP = getConfig("return_ip")
 	config.DbPath = getConfig("db_file")
-	port, err := strconv.ParseInt(getConfig("http_port"), 10, 16)
-	checkErr(err)
-	config.HttpPort = uint16(port)
-	fmt.Printf("[*] HTTP API端口: %d\n", port)
+	config.ListenHttp = getConfig("listen_http")
+	config.ListenDNS = getConfig("listen_dns")
+	fmt.Printf("[*] HTTP API: %s\n", config.ListenHttp)
 	fmt.Println("[*] 配置文件加载完毕")
 }
 
@@ -116,7 +115,7 @@ func (this *handler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 			var record DNS
 			record.Domain = domain
 			record.Type = "A"
-			record.Resp = config.DefaultIp
+			record.Resp = config.ReturnIP
 			record.Src = w.RemoteAddr().String()
 			record.Created = time.Now().Local()
 			_ = saveDatabase(record)
@@ -145,8 +144,8 @@ func main() {
 	check()
 	go httpServer()
 	fmt.Println("[+] Server Started!")
-	listenAddr := fmt.Sprintf(":%s", strconv.Itoa(53))
-	srv := &dns.Server{Addr: listenAddr, Net: "udp"}
+	fmt.Printf("[+] DNS Interface: %s\n", config.ListenDNS)
+	srv := &dns.Server{Addr: config.ListenDNS, Net: "udp"}
 	srv.Handler = &handler{}
 	if err := srv.ListenAndServe(); err != nil {
 		log.Fatalf("Failed to set udp listener %s\n", err.Error())
@@ -223,7 +222,7 @@ func httpServer() {
 			"msg":    "Wrong 🐖",
 		})
 	})
-	listenAddr := fmt.Sprintf("0.0.0.0:%d", config.HttpPort)
+	listenAddr := fmt.Sprintf(config.ListenHttp)
 	fmt.Printf("[*] HTTP API: %s\n", listenAddr)
 	_ = r.Run(listenAddr)
 }
