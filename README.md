@@ -64,6 +64,10 @@ POST /api/validate
 systemctl stop systemd-resolved.service
 systemctl disable systemd-resolved.service
 echo "nameserver 223.5.5.5" > /etc/resolv.conf
+
+2. UDP53端口权限问题
+一般来说，在Linux系统中，监听UDP53端口需要root权限，
+如果担心安全问题，可以在Docker中运行或者使用端口转发。
 ```
 
 ### 在Docker中运行
