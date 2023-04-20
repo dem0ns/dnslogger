@@ -27,7 +27,7 @@ go build
 
 ```
 # 发送DNS请求
-dig dnslogger.local @127.0.0.1
+dig dnslogger.local @1.1.1.1
 
 # 查询最新的5条DNS请求
 curl http://localhost:2020/api/latest -v
