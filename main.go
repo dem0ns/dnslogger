@@ -148,7 +148,8 @@ func main() {
 	srv := &dns.Server{Addr: config.ListenDNS, Net: "udp"}
 	srv.Handler = &handler{}
 	if err := srv.ListenAndServe(); err != nil {
-		log.Fatalf("Failed to set udp listener %s\n", err.Error())
+		log.Printf("DNS server start failed: %s.\nTry `sudo`.\n", err.Error())
+		os.Exit(0)
 	}
 }
 
