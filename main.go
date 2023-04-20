@@ -38,6 +38,7 @@ type Config struct {
 type Query struct {
 	Domain string `form:"Domain"`
 }
+type handler struct{}
 
 var config Config
 
@@ -46,18 +47,17 @@ func checkErr(err error) {
 		panic(err)
 	}
 }
-
 func checkErrWarmly(err error) {
 	if err != nil {
 		log.Println(err)
 	}
 }
 
-func getConfig(str string) string {
-	var err error
+func LoadConfig() {
+	fmt.Println("[*] Loading config")
 	var config_file = "config.ini"
 	if _, err := os.Stat(config_file); os.IsNotExist(err) {
-		fmt.Println("[*] 配置文件不存在")
+		fmt.Println("[*] Config file not found, creating...")
 		src, err := os.Open("config.default.ini")
 		defer func(src *os.File) {
 			checkErr(src.Close())
@@ -68,31 +68,30 @@ func getConfig(str string) string {
 			checkErr(dst.Close())
 		}(dst)
 		_, _ = io.Copy(dst, src)
-		fmt.Println("[*] 已创建配置文件")
+		fmt.Println("[*] Created config.ini")
 	}
-	config, err := ini.Load(config_file)
+	config_ptr, err := ini.Load(config_file)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	config_section, err := config.GetSection("config")
-	if err != nil {
-		log.Println("读取section失败")
-	}
-	value, err := config_section.GetKey(str)
-	if err != nil {
-		log.Fatalln("读取" + str + "失败，请设置！")
-	}
-	return value.String()
-}
 
-func LoadConfig() {
-	fmt.Println("[*] 加载配置文件...")
+	// sub func
+	getConfig := func(str string) string {
+		config_section, err := config_ptr.GetSection("config")
+		if err != nil {
+			log.Println("Read section [config] failed, please check your config.ini")
+		}
+		value, err := config_section.GetKey(str)
+		if err != nil {
+			log.Fatalf("读取%s失败，请设置！\n", str)
+		}
+		return value.String()
+	}
 	config.ReturnIP = getConfig("return_ip")
 	config.DbPath = getConfig("db_file")
 	config.ListenHttp = getConfig("listen_http")
 	config.ListenDNS = getConfig("listen_dns")
-	fmt.Printf("[*] HTTP API: %s\n", config.ListenHttp)
-	fmt.Println("[*] 配置文件加载完毕")
+	fmt.Println("[*] Config loaded")
 }
 
 func saveDatabase(record DNS) bool {
@@ -101,8 +100,6 @@ func saveDatabase(record DNS) bool {
 	fmt.Printf("[+] REQ [%s] FROM [%s] RESP [%s]\n", record.Domain, record.Src, record.Resp)
 	return true
 }
-
-type handler struct{}
 
 func (this *handler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 	msg := dns.Msg{}
@@ -129,21 +126,11 @@ func (this *handler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 }
 
 func main() {
-	fmt.Println("[+] Hello from DNSLogger")
-	fmt.Println("[+] Starting...")
+	fmt.Println("[+] DNSLogger Starting...")
 	LoadConfig()
-	var err error
-	db, err = sql.Open("sqlite3", config.DbPath)
-	checkErr(err)
-	defer func(db *sql.DB) {
-		err := db.Close()
-		checkErr(err)
-	}(db)
-	err = db.Ping()
-	checkErr(err)
 	check()
 	go httpServer()
-	fmt.Println("[+] Server Started!")
+	fmt.Println("[+] Started!")
 	fmt.Printf("[+] DNS Interface: %s\n", config.ListenDNS)
 	srv := &dns.Server{Addr: config.ListenDNS, Net: "udp"}
 	srv.Handler = &handler{}
@@ -154,23 +141,28 @@ func main() {
 }
 
 func check() {
-	fmt.Println("[*] 数据库检查...")
+	fmt.Println("[*] Database checking")
+	var err error
+	db, err = sql.Open("sqlite3", config.DbPath)
+	checkErr(err)
+	err = db.Ping()
+	checkErr(err)
 	exec, err := db.Query("SELECT name FROM sqlite_master WHERE type='table' AND name='dnslog';")
 	checkErr(err)
 	defer func(exec *sql.Rows) {
 		checkErr(exec.Close())
 	}(exec)
 	if !exec.Next() {
-		fmt.Println("[*] 数据库初始化中")
+		fmt.Println("[*] Database initializing...")
 		initSql := "create table dnslog(id integer constraint dnslog_pk primary key autoincrement, domain text, type text, resp text, src text, created_at text);"
 		_, err := db.Exec(initSql)
 		checkErr(err)
 		initSql = "create index dnslog_domain_index on dnslog (domain);"
 		_, err = db.Exec(initSql)
 		checkErr(err)
-		fmt.Println("[*] 数据库初始化完毕")
+		fmt.Println("[*] Database initialized.")
 	}
-	fmt.Println("[*] 数据库检查完毕")
+	fmt.Println("[*] Database checking done.")
 }
 
 func httpServer() {
@@ -209,7 +201,7 @@ func httpServer() {
 			if err != nil {
 				checkErrWarmly(err)
 				c.JSON(http.StatusNoContent, gin.H{
-					"msg": "No record within 5 minute.",
+					"msg": "No record found in the last 5 minutes",
 				})
 				return
 			}
@@ -220,7 +212,7 @@ func httpServer() {
 		}
 		c.JSON(http.StatusNotAcceptable, gin.H{
 			"status": "0",
-			"msg":    "Wrong 🐖",
+			"msg":    "Wrong request format",
 		})
 	})
 	listenAddr := fmt.Sprintf(config.ListenHttp)
