@@ -1,18 +1,22 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
-	"github.com/gin-gonic/gin"
-	_ "github.com/mattn/go-sqlite3"
-	"github.com/miekg/dns"
-	"gopkg.in/ini.v1"
 	"io"
 	"log"
 	"net"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	_ "github.com/mattn/go-sqlite3"
+	"github.com/miekg/dns"
+	"gopkg.in/ini.v1"
 )
 
 var db *sql.DB
@@ -38,83 +42,87 @@ type Config struct {
 type Query struct {
 	Domain string `form:"Domain"`
 }
+
 type handler struct{}
 
 var config Config
 
-func checkErr(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
-func checkErrWarmly(err error) {
-	if err != nil {
-		log.Println(err)
-	}
-}
-
 func LoadConfig() {
 	fmt.Println("[*] Loading config")
-	var config_file = "config.ini"
-	if _, err := os.Stat(config_file); os.IsNotExist(err) {
+	var configFile = "config.ini"
+	if _, err := os.Stat(configFile); os.IsNotExist(err) {
 		fmt.Println("[*] Config file not found, creating...")
 		src, err := os.Open("config.default.ini")
-		defer func(src *os.File) {
-			checkErr(src.Close())
-		}(src)
-		dst, err := os.OpenFile(config_file, os.O_WRONLY|os.O_CREATE, 0644)
-		checkErr(err)
-		defer func(dst *os.File) {
-			checkErr(dst.Close())
-		}(dst)
-		_, _ = io.Copy(dst, src)
-		fmt.Println("[*] Created config.ini")
-	}
-	config_ptr, err := ini.Load(config_file)
-	if err != nil {
-		log.Fatalln(err)
+		if err != nil {
+			log.Fatalf("Failed to open config.default.ini: %v", err)
+		}
+		defer src.Close()
+
+		dst, err := os.OpenFile(configFile, os.O_WRONLY|os.O_CREATE, 0644)
+		if err != nil {
+			log.Fatalf("Failed to create config.ini: %v", err)
+		}
+		defer dst.Close()
+
+		if _, err := io.Copy(dst, src); err != nil {
+			log.Fatalf("Failed to copy config file: %v", err)
+		}
+		fmt.Println("[*] Config file `config.ini` created.")
 	}
 
-	// sub func
-	getConfig := func(str string) string {
-		config_section, err := config_ptr.GetSection("config")
+	configPtr, err := ini.Load(configFile)
+	if err != nil {
+		log.Fatalf("Failed to load config: %v", err)
+	}
+
+	getConfig := func(key string) string {
+		section, err := configPtr.GetSection("config")
 		if err != nil {
-			log.Println("Read section [config] failed, please check your config.ini")
+			log.Fatal("Failed to read section [config], please check your config.ini")
 		}
-		value, err := config_section.GetKey(str)
+		value, err := section.GetKey(key)
 		if err != nil {
-			log.Fatalf("读取%s失败，请设置！\n", str)
+			log.Fatalf("Failed to read config key '%s', please set it in config.ini", key)
 		}
 		return value.String()
 	}
+
 	config.ReturnIP = getConfig("return_ip")
+	if net.ParseIP(config.ReturnIP) == nil {
+		log.Fatalf("Invalid return_ip '%s' in config.ini", config.ReturnIP)
+	}
 	config.DbPath = getConfig("db_file")
 	config.ListenHttp = getConfig("listen_http")
 	config.ListenDNS = getConfig("listen_dns")
 	fmt.Println("[*] Config loaded")
 }
 
-func saveDatabase(record DNS) bool {
-	_, err := db.Exec("INSERT INTO `dnslog` (`domain`, `type`, `resp`, `src`, `created_at`) VALUES (?, ?, ?, ?, ?)", &record.Domain, &record.Type, &record.Resp, &record.Src, &record.Created)
-	checkErrWarmly(err)
+func saveDatabase(record DNS) error {
+	_, err := db.Exec("INSERT INTO `dnslog` (`domain`, `type`, `resp`, `src`, `created_at`) VALUES (?, ?, ?, ?, ?)",
+		&record.Domain, &record.Type, &record.Resp, &record.Src, &record.Created)
+	if err != nil {
+		log.Printf("[-] Failed to save DNS record: %v", err)
+		return err
+	}
 	fmt.Printf("[+] REQ [%s] FROM [%s] RESP [%s]\n", record.Domain, record.Src, record.Resp)
-	return true
+	return nil
 }
 
-func (this *handler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
+func (h *handler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 	msg := dns.Msg{}
 	msg.SetReply(r)
 	switch r.Question[0].Qtype {
 	case dns.TypeA:
 		msg.Authoritative = true
 		domain := msg.Question[0].Name
-		if true {
-			var record DNS
-			record.Domain = domain
-			record.Type = "A"
-			record.Resp = config.ReturnIP
-			record.Src = w.RemoteAddr().String()
-			record.Created = time.Now().Local()
+		if len(domain) > 1 {
+			record := DNS{
+				Domain:  domain[:len(domain)-1],
+				Type:    "A",
+				Resp:    config.ReturnIP,
+				Src:     w.RemoteAddr().String(),
+				Created: time.Now().Local(),
+			}
 			_ = saveDatabase(record)
 			msg.Answer = append(msg.Answer, &dns.A{
 				Hdr: dns.RR_Header{Name: domain, Rrtype: dns.TypeA, Class: dns.ClassINET, Ttl: 0},
@@ -128,38 +136,67 @@ func (this *handler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 func main() {
 	fmt.Println("[+] DNSLogger Starting...")
 	LoadConfig()
-	check()
+	checkDatabase()
+
+	// Graceful shutdown
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	// Start HTTP server
+	srv := &dns.Server{Addr: config.ListenDNS, Net: "udp", Handler: &handler{}}
+
 	go httpServer()
+
 	fmt.Println("[+] Started!")
 	fmt.Printf("[+] DNS Interface: %s\n", config.ListenDNS)
-	srv := &dns.Server{Addr: config.ListenDNS, Net: "udp"}
-	srv.Handler = &handler{}
+
+	go func() {
+		<-ctx.Done()
+		fmt.Println("\n[*] Shutting down...")
+		if err := srv.Shutdown(); err != nil {
+			log.Printf("[-] DNS server shutdown error: %v", err)
+		}
+		if db != nil {
+			db.Close()
+		}
+	}()
+
 	if err := srv.ListenAndServe(); err != nil {
-		log.Printf("DNS server start failed: %s.\nTry `sudo`.\n", err.Error())
-		os.Exit(0)
+		if ctx.Err() != nil {
+			fmt.Println("[+] Stopped.")
+			return
+		}
+		log.Fatalf("DNS server start failed: %v\nTry `sudo`.", err)
 	}
 }
 
-func check() {
+func checkDatabase() {
 	fmt.Println("[*] Database checking")
 	var err error
 	db, err = sql.Open("sqlite3", config.DbPath)
-	checkErr(err)
-	err = db.Ping()
-	checkErr(err)
-	exec, err := db.Query("SELECT name FROM sqlite_master WHERE type='table' AND name='dnslog';")
-	checkErr(err)
-	defer func(exec *sql.Rows) {
-		checkErr(exec.Close())
-	}(exec)
-	if !exec.Next() {
+	if err != nil {
+		log.Fatalf("Failed to open database: %v", err)
+	}
+	if err = db.Ping(); err != nil {
+		log.Fatalf("Failed to ping database: %v", err)
+	}
+
+	rows, err := db.Query("SELECT name FROM sqlite_master WHERE type='table' AND name='dnslog';")
+	if err != nil {
+		log.Fatalf("Failed to query database tables: %v", err)
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
 		fmt.Println("[*] Database initializing...")
-		initSql := "create table dnslog(id integer constraint dnslog_pk primary key autoincrement, domain text, type text, resp text, src text, created_at text);"
-		_, err := db.Exec(initSql)
-		checkErr(err)
-		initSql = "create index dnslog_domain_index on dnslog (domain);"
-		_, err = db.Exec(initSql)
-		checkErr(err)
+		initSql := "CREATE TABLE dnslog(id INTEGER CONSTRAINT dnslog_pk PRIMARY KEY AUTOINCREMENT, domain TEXT, type TEXT, resp TEXT, src TEXT, created_at TEXT);"
+		if _, err := db.Exec(initSql); err != nil {
+			log.Fatalf("Failed to create table: %v", err)
+		}
+		initSql = "CREATE INDEX dnslog_domain_index ON dnslog (domain);"
+		if _, err := db.Exec(initSql); err != nil {
+			log.Fatalf("Failed to create index: %v", err)
+		}
 		fmt.Println("[*] Database initialized.")
 	}
 	fmt.Println("[*] Database checking done.")
@@ -168,54 +205,55 @@ func check() {
 func httpServer() {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
+
 	r.GET("/api/latest", func(c *gin.Context) {
 		rows, err := db.Query("SELECT `id`, `domain`, `type`, `resp`, `src`, datetime(created_at) FROM dnslog ORDER BY `id` DESC LIMIT 10")
-		checkErrWarmly(err)
 		if err != nil {
-			log.Fatal(err)
+			log.Printf("[-] Query latest failed: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"msg": "Database query failed"})
+			return
 		}
-		defer func(rows *sql.Rows) {
-			checkErrWarmly(rows.Close())
-		}(rows)
+		defer rows.Close()
+
 		logs := make([]DNS, 0)
 		for rows.Next() {
 			var d DNS
 			var timeCreated string
-			err = rows.Scan(&d.Id, &d.Domain, &d.Type, &d.Resp, &d.Src, &timeCreated)
+			if err := rows.Scan(&d.Id, &d.Domain, &d.Type, &d.Resp, &d.Src, &timeCreated); err != nil {
+				log.Printf("[-] Scan row failed: %v", err)
+				continue
+			}
 			d.Created, _ = time.Parse(TimeLayout, timeCreated)
 			logs = append(logs, d)
 		}
-		c.JSON(http.StatusOK, gin.H{
-			"data": logs,
-		})
+		c.JSON(http.StatusOK, gin.H{"data": logs})
 	})
+
 	r.POST("/api/validate", func(c *gin.Context) {
 		var query Query
-		if c.ShouldBindJSON(&query) == nil {
-			var d DNS
-			query.Domain += "."
-			m, _ := time.ParseDuration("-5m")
-			var timeCreated string
-			err := db.QueryRow("SELECT `id`, `domain`,`type`,`resp`,`src`,datetime(created_at) FROM dnslog WHERE `domain` = ? and `created_at` >= ? LIMIT 1", query.Domain, time.Now().Add(m)).Scan(&d.Id, &d.Domain, &d.Type, &d.Resp, &d.Src, &timeCreated)
-			d.Created, _ = time.Parse(TimeLayout, timeCreated)
-			if err != nil {
-				checkErrWarmly(err)
-				c.JSON(http.StatusNoContent, gin.H{
-					"msg": "No record found in the last 5 minutes",
-				})
-				return
-			}
-			c.JSON(http.StatusOK, gin.H{
-				"data": d,
+		if c.ShouldBindJSON(&query) != nil {
+			c.JSON(http.StatusNotAcceptable, gin.H{
+				"status": "0",
+				"msg":    "Wrong request format",
 			})
 			return
 		}
-		c.JSON(http.StatusNotAcceptable, gin.H{
-			"status": "0",
-			"msg":    "Wrong request format",
-		})
+		query.Domain += "."
+		m, _ := time.ParseDuration("-5m")
+		var d DNS
+		var timeCreated string
+		err := db.QueryRow("SELECT `id`, `domain`,`type`,`resp`,`src`,datetime(created_at) FROM dnslog WHERE `domain` = ? AND `created_at` >= ? LIMIT 1",
+			query.Domain, time.Now().Add(m)).Scan(&d.Id, &d.Domain, &d.Type, &d.Resp, &d.Src, &timeCreated)
+		if err != nil {
+			c.JSON(http.StatusNoContent, gin.H{
+				"msg": "No record found in the last 5 minutes",
+			})
+			return
+		}
+		d.Created, _ = time.Parse(TimeLayout, timeCreated)
+		c.JSON(http.StatusOK, gin.H{"data": d})
 	})
-	listenAddr := fmt.Sprintf(config.ListenHttp)
-	fmt.Printf("[*] HTTP API: %s\n", listenAddr)
-	_ = r.Run(listenAddr)
+
+	fmt.Printf("[*] HTTP API: %s\n", config.ListenHttp)
+	_ = r.Run(config.ListenHttp)
 }

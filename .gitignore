@@ -1,6 +1,35 @@
+# Binaries
+dnslogger
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary
+*.test
+
+# Go workspace
+go.work
+go.work.sum
+
+# Dependency directory
+vendor
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+
+# Project config & data
 config.ini
 *.db
-.idea
-!.gitignore
-vendor
-dnslogger
+
+# Environment
+.env
+.env.*

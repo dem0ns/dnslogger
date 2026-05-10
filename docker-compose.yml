@@ -6,6 +6,7 @@ services:
     restart: always
     volumes:
       - ./dnslogger:/srv/dnslogger
+      - ./config.default.ini:/srv/config.default.ini
     ports:
       - "53:53/udp"
-      - "1965:1965/tcp"
+      - "2020:2020/tcp"
