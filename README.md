@@ -1,132 +1,92 @@
 # DNSLogger
 
-自建 DNSLog 平台，用于安全测试中检测 DNS 请求回连。支持 DNS 查询记录、HTTP API 查询，开箱即用。
+A self-hosted DNSLog platform for security testing. Captures DNS callbacks with a web dashboard, real-time streaming, and filter rules.
 
-![运行效果](images/running.png)
+![Running](images/running.png)
 
-## 功能特性
+## Features
 
-- DNS 请求监听与记录（A 记录）
-- HTTP API 查询接口（Gin 框架）
-- SQLite 本地存储，无需额外数据库依赖
-- 支持 Docker 一键部署
-- 优雅关闭，自动资源回收
+- DNS request logging with A record responses
+- Web dashboard with real-time WebSocket log streaming
+- Filter rules (exact, wildcard, regex, contains) for allow/block
+- Configurable upstream DNS forwarding
+- SQLite storage, no external dependencies
+- Simple mode for quick domain interception
 
-## 快速开始
+## Quick Start
 
-### 编译运行
+### Build & Run (Full Mode)
 
 ```bash
-# 可选：设置国内 Go 代理
-export GOPROXY=https://proxy.golang.com.cn,direct
-
 go build
 ./dnslogger
 ```
 
-> 因使用了 go-sqlite3（CGO），编译遇问题请参考 [go-sqlite3 文档](https://github.com/mattn/go-sqlite3)。
+### Simple Mode
 
-### Docker 部署
+For quick domain interception without the database/web UI:
 
 ```bash
-# 先编译好二进制文件，然后：
+./dnslogger simple -addr :53 -ip 12.12.12.12
+```
+
+### Docker
+
+```bash
 docker-compose up -d
 ```
 
-## 域名配置
+## Configuration
 
-假设你的域名为 `dnslogger.local`，服务器 IP 为 `1.1.1.1`，接收子域为 `*.log.dnslogger.local`：
-
-| 步骤 | 记录类型 | 主机记录 | 记录值 |
-|------|---------|---------|--------|
-| 1 | NS | `log` | `ns.dnslogger.local.` |
-| 2 | A | `ns` | `1.1.1.1` |
-
-配置完成后，在服务器上启动 DNSLogger 即可。
-
-## 配置说明
-
-首次运行会自动从 `config.default.ini` 生成 `config.ini`：
+On first run, a default config is loaded. Manage via API or edit the database directly.
 
 ```ini
 [config]
-db_file = dnslog.db          # SQLite 数据库文件路径
-return_ip = 127.0.0.1        # DNS 响应返回的 IP 地址
-listen_dns = 0.0.0.0:53      # DNS 监听地址
-listen_http = 0.0.0.0:2020   # HTTP API 监听地址
-domain = log.dnslogger.local # 接收 DNS 请求的子域
+db_file = dnslog.db
+return_ip = 127.0.0.1
+upstream_dns = 8.8.8.8
+listen_dns = 0.0.0.0:53
+listen_http = 0.0.0.0:2020
+domain = log.example.com
 ```
 
-## API 文档
+## Domain Setup
 
-### 查询最新记录
+| Type | Host | Value |
+|------|------|-------|
+| NS | `log` | `ns.yourdomain.com.` |
+| A | `ns` | `your-server-ip` |
 
-```
-GET /api/latest
-```
+## API
 
-返回最近 10 条 DNS 请求记录。
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/logs` | Query logs (supports `domain`, `limit`, `offset`) |
+| GET | `/api/logs/count` | Get log count |
+| POST | `/api/validate` | Check if domain received a query (last N minutes) |
+| DELETE | `/api/logs` | Clear all logs |
+| GET | `/api/config` | Get config |
+| PUT | `/api/config` | Update config |
+| GET | `/api/filters` | List filter rules |
+| POST | `/api/filters` | Create filter rule |
+| PUT | `/api/filters/:id` | Update filter rule |
+| DELETE | `/api/filters/:id` | Delete filter rule |
+| GET | `/ws/logs` | WebSocket live log stream |
 
-**响应示例：**
-
-```json
-{
-  "data": [
-    {
-      "Id": 1,
-      "Domain": "test.log.dnslogger.local.",
-      "Type": "A",
-      "Resp": "1.1.1.1",
-      "Src": "192.168.1.100:12345",
-      "Created": "2026-05-10T12:00:00Z"
-    }
-  ]
-}
-```
-
-### 验证域名请求
-
-```
-POST /api/validate
-Content-Type: application/json
-
-{"domain": "test.log.dnslogger.local"}
-```
-
-查询最近 5 分钟内是否有指定域名的 DNS 请求，常用于漏洞验证场景。
-
-**响应：** 存在记录返回 200 + 记录详情，无记录返回 204。
-
-## 测试
+## Usage Example
 
 ```bash
-# 发送 DNS 请求
-dig test.log.dnslogger.local @1.1.1.1
+# Send DNS query
+dig test.log.example.com @your-server-ip
 
-# 查询最新记录
-curl http://localhost:2020/api/latest
+# Query logs
+curl http://localhost:2020/api/logs
 
-# 验证域名请求（5分钟内）
+# Validate domain (default 5 min window)
 curl -X POST http://localhost:2020/api/validate \
   -H "Content-Type: application/json" \
-  -d '{"domain":"test.log.dnslogger.local"}'
+  -d '{"domain":"test.log.example.com"}'
 ```
-
-## 常见问题
-
-### Ubuntu 无法监听 UDP 53 端口
-
-Ubuntu 默认的 `systemd-resolved` 服务占用了 53 端口，需要先关闭：
-
-```bash
-sudo systemctl stop systemd-resolved
-sudo systemctl disable systemd-resolved
-echo "nameserver 223.5.5.5" | sudo tee /etc/resolv.conf
-```
-
-### 非 root 用户无法监听 53 端口
-
-53 是特权端口，建议使用 `sudo` 运行，或通过 Docker 部署规避权限问题。
 
 ## License
 
