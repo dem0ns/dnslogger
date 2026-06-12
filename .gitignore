@@ -29,6 +29,8 @@ vendor
 # Project config & data
 config.ini
 *.db
+*.db-shm
+*.db-wal
 
 # Environment
 .env
