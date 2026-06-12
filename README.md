@@ -1,42 +1,35 @@
 # DNSLogger
 
-A self-hosted DNSLog platform for security testing with a web dashboard.
+自建 DNSLog 平台，用于安全测试中检测 DNS 请求回连。
 
-![Running](images/running.png)
+## 功能特性
 
-## Quick Start
+- DNS 请求记录与实时流（WebSocket）
+- A 记录规则：通配符 / 正则 / 精确 / 匹配，每条可配独立 IP
+- 上游 DNS 转发，无规则时默认放行
+- Web 管理界面：日志查询、配置管理、规则管理
+- 多语言支持（中文 / English）
+- 简单模式：`dnslogger simple`，无需数据库
+
+## 快速开始
 
 ```bash
-go build
+go build -o dnslogger .
 ./dnslogger
 ```
 
-Open `http://localhost:2020` to access the dashboard.
+打开 `http://127.0.0.1:8053` 访问管理界面。
 
-## Features
-
-- DNS request logging
-- Real-time log streaming via WebSocket
-- Filter rules (allow/block) with pattern matching
-- Configurable via web UI
-- Simple mode for quick domain interception
-
-## Configuration
-
-```ini
-[config]
-db_file = dnslog.db
-return_ip = 127.0.0.1
-listen_dns = 0.0.0.0:53
-listen_http = 0.0.0.0:2020
-```
-
-## Simple Mode
+## 简单模式
 
 ```bash
-./dnslogger simple -addr :53 -ip 12.12.12.12
+./dnslogger simple --addr :53 --ip 12.12.12.12
 ```
 
 ## License
 
 [MIT](LICENSE)
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=dem0ns/dnslogger&type=Date)](https://star-history.com/#dem0ns/dnslogger&Date)
