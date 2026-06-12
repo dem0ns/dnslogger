@@ -2,7 +2,7 @@
 
 自建 DNSLog 平台，用于安全测试中检测 DNS 请求回连。支持 DNS 查询记录、HTTP API 查询，开箱即用。
 
-![运行效果](images/running.jpg)
+![运行效果](images/running.png)
 
 ## 功能特性
 
