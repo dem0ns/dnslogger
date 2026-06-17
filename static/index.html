@@ -23,9 +23,6 @@ a { color: var(--accent); text-decoration: none; }
 .lang-btn { padding: 4px 10px; font-size: 12px; border: none; background: transparent; color: var(--text-dim); cursor: pointer; border-radius: 4px; transition: all 0.15s; }
 .lang-btn.active { background: var(--accent); color: #fff; }
 .container { max-width: 1200px; margin: 0 auto; padding: 20px 24px; }
-.validate-bar { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 20px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-.validate-bar input { flex: 1; min-width: 200px; }
-.validate-result { font-size: 13px; padding: 4px 12px; border-radius: var(--radius); }
 .tabs { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 0; }
 .tab { padding: 8px 16px; cursor: pointer; border: 1px solid transparent; border-bottom: none; border-radius: var(--radius) var(--radius) 0 0; color: var(--text-dim); font-size: 14px; transition: all 0.2s; }
 .tab:hover { color: var(--text); }
@@ -102,15 +99,6 @@ tr:hover td { background: #f6f8fa; }
 </div>
 
 <div class="container">
-    <!-- Validate Bar -->
-    <div class="validate-bar">
-        <span style="font-size:13px;color:var(--text-dim);white-space:nowrap" data-i18n="validateLabel">🔍 域名验证:</span>
-        <input id="validateDomain" data-i18n-placeholder="validatePlaceholder" placeholder="输入域名，如 abc.example.com" onkeydown="if(event.key==='Enter')doValidate()">
-        <input id="validateMinutes" type="number" value="5" min="1" max="60" style="width:80px">
-        <button onclick="doValidate()" data-i18n="check">检查</button>
-        <span id="validateResult" class="validate-result"></span>
-    </div>
-
     <!-- Tabs -->
     <div class="tabs">
         <div class="tab active" onclick="switchTab('logs')" data-i18n="tabLogs">📋 DNS 日志</div>
@@ -135,8 +123,7 @@ tr:hover td { background: #f6f8fa; }
         </div>
         <div style="margin-top:20px">
             <div class="toolbar">
-                <input id="logSearch" data-i18n-placeholder="searchHistory" placeholder="搜索历史域名..." onkeydown="if(event.key==='Enter')loadLogs()">
-                <button onclick="loadLogs()" data-i18n="search">搜索</button>
+                <input id="logSearch" data-i18n-placeholder="searchHistory" placeholder="搜索历史域名...">
                 <button class="btn-outline" onclick="loadLogs()" data-i18n="refresh">刷新</button>
                 <div style="flex:1"></div>
                 <button class="btn-danger btn-sm" onclick="clearLogs()" data-i18n="clearHistory">清空历史</button>
@@ -243,11 +230,10 @@ let lang = localStorage.getItem('lang') || 'zh';
 // --- i18n ---
 const i18n = {
     zh: {
-        validateLabel: '🔍 域名验证:', validatePlaceholder: '输入域名，如 abc.example.com',
-        check: '检查', tabLogs: '📋 DNS 日志', tabConfig: '⚙️ 配置管理', tabFilters: '🔍 A 记录规则',
+        tabLogs: '📋 DNS 日志', tabConfig: '⚙️ 配置管理', tabFilters: '🔍 A 记录规则',
         connecting: '连接中...', connected: '已连接', disconnected: '已断开，3秒后重连...', connError: '连接错误',
         pause: '⏸ 暂停', resume: '▶ 继续', clear: '清空', waitingDNS: '等待 DNS 请求...',
-        searchHistory: '搜索历史域名...', search: '搜索', refresh: '刷新', clearHistory: '清空历史',
+        searchHistory: '搜索历史域名...', refresh: '刷新', clearHistory: '清空历史',
         thDomain: '域名', thType: '类型', thRespIP: '响应IP', thSrc: '来源', thTime: '时间',
         noHistory: '暂无历史记录', prev: '上一页', next: '下一页',
         basicConfig: '基本配置', cfgReturnIP: '默认返回 IP — 拦截域名时的默认 IP（规则未单独配置时使用）',
@@ -260,21 +246,19 @@ const i18n = {
         add: '添加', saveBtn: '保存', cancel: '取消',
         thPattern: '域名模式', thType2: '类型', thReturnIP: '返回 IP', thAction: '动作',
         thEnabled: '启用', thOperate: '操作', noRules: '暂无规则（无规则时所有请求正常转发）',
-        edit: '编辑', del: '删除', found: '✓ 已找到', notFound: '✗ 未找到',
-        within: '分钟内', reqFailed: '请求失败', loadFail: '加载失败',
-        saved: '配置已保存', saveFail: '保存失败', ruleAdded: '规则已添加',
+        edit: '编辑', del: '删除',
+        loadFail: '加载失败', saved: '配置已保存', saveFail: '保存失败', ruleAdded: '规则已添加',
         ruleUpdated: '规则已更新', ruleDeleted: '规则已删除', opFail: '操作失败',
-        patternRequired: '域名模式必填', confirmClear: '确定要清空所有日志吗？',
+        patternRequired: '域名模式必填',
         confirmDelete: '确定删除此规则？', logsCleared: '日志已清空', clearFail: '清空失败',
         total: '共', items: '条', page: '第', pageUnit: '页',
         entries: ' 条'
     },
     en: {
-        validateLabel: '🔍 Domain Verify:', validatePlaceholder: 'Enter domain, e.g. abc.example.com',
-        check: 'Check', tabLogs: '📋 DNS Logs', tabConfig: '⚙️ Config', tabFilters: '🔍 A Record Rules',
+        tabLogs: '📋 DNS Logs', tabConfig: '⚙️ Config', tabFilters: '🔍 A Record Rules',
         connecting: 'Connecting...', connected: 'Connected', disconnected: 'Disconnected, reconnecting in 3s...', connError: 'Connection Error',
         pause: '⏸ Pause', resume: '▶ Resume', clear: 'Clear', waitingDNS: 'Waiting for DNS requests...',
-        searchHistory: 'Search history domains...', search: 'Search', refresh: 'Refresh', clearHistory: 'Clear History',
+        searchHistory: 'Search history domains...', refresh: 'Refresh', clearHistory: 'Clear History',
         thDomain: 'Domain', thType: 'Type', thRespIP: 'Response IP', thSrc: 'Source', thTime: 'Time',
         noHistory: 'No history records', prev: 'Prev', next: 'Next',
         basicConfig: 'Basic Config', cfgReturnIP: 'Default Return IP — used when rule has no IP configured',
@@ -287,11 +271,10 @@ const i18n = {
         add: 'Add', saveBtn: 'Save', cancel: 'Cancel',
         thPattern: 'Domain Pattern', thType2: 'Type', thReturnIP: 'Return IP', thAction: 'Action',
         thEnabled: 'Enabled', thOperate: 'Actions', noRules: 'No rules (all requests forwarded normally)',
-        edit: 'Edit', del: 'Delete', found: '✓ Found', notFound: '✗ Not found',
-        within: 'min', reqFailed: 'Request failed', loadFail: 'Load failed',
-        saved: 'Config saved', saveFail: 'Save failed', ruleAdded: 'Rule added',
+        edit: 'Edit', del: 'Delete',
+        loadFail: 'Load failed', saved: 'Config saved', saveFail: 'Save failed', ruleAdded: 'Rule added',
         ruleUpdated: 'Rule updated', ruleDeleted: 'Rule deleted', opFail: 'Operation failed',
-        patternRequired: 'Domain pattern required', confirmClear: 'Clear all logs?',
+        patternRequired: 'Domain pattern required',
         confirmDelete: 'Delete this rule?', logsCleared: 'Logs cleared', clearFail: 'Clear failed',
         total: 'Total', items: '', page: 'Page', pageUnit: '',
         entries: ''
@@ -387,25 +370,6 @@ function toast(msg, type = 'success') {
     setTimeout(() => el.remove(), 3000);
 }
 
-// --- Validate ---
-async function doValidate() {
-    const domain = document.getElementById('validateDomain').value.trim();
-    if (!domain) return;
-    const minutes = parseInt(document.getElementById('validateMinutes').value) || 5;
-    const el = document.getElementById('validateResult');
-    try {
-        const res = await fetch(API + '/api/validate', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({domain, minutes}) });
-        const data = await res.json();
-        if (data.found) {
-            el.textContent = `${t('found')}: ${data.data.domain} (${data.data.src})`;
-            el.style.background = 'rgba(63,185,80,0.15)'; el.style.color = 'var(--green)';
-        } else {
-            el.textContent = `${t('notFound')} (${minutes}${t('within')})`;
-            el.style.background = 'rgba(248,81,73,0.15)'; el.style.color = 'var(--red)';
-        }
-    } catch(e) { el.textContent = t('reqFailed'); el.style.background = 'rgba(248,81,73,0.15)'; el.style.color = 'var(--red)'; }
-}
-
 // --- Logs ---
 async function loadLogs() {
     const domain = document.getElementById('logSearch').value.trim();
@@ -426,7 +390,6 @@ async function loadLogs() {
 function logsPrev() { if (logsOffset >= logsLimit) { logsOffset -= logsLimit; loadLogs(); } }
 function logsNext() { logsOffset += logsLimit; loadLogs(); }
 async function clearLogs() {
-    if (!confirm(t('confirmClear'))) return;
     try { await fetch(API + '/api/logs', {method: 'DELETE'}); toast(t('logsCleared')); logsOffset = 0; loadLogs(); } catch(e) { toast(t('clearFail'), 'error'); }
 }
 
@@ -515,6 +478,13 @@ async function deleteRule(id) {
 // --- Helpers ---
 function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 function fmtTime(t) { if (!t) return ''; try { return t.replace('T', ' ').replace('Z', '').substring(0, 19); } catch(e) { return t; } }
+
+// --- Auto-search with debounce ---
+let searchTimer = null;
+document.getElementById('logSearch').addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => { logsOffset = 0; loadLogs(); }, 300);
+});
 
 // --- Init ---
 applyLang();

@@ -1,0 +1,146 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-linux-windows:
+    name: Linux & Windows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          cache: false
+
+      - name: Install zig
+        run: |
+          ZIG_VERSION=0.13.0
+          curl -sSL "https://ziglang.org/download/${ZIG_VERSION}/zig-linux-x86_64-${ZIG_VERSION}.tar.xz" -o /tmp/zig.tar.xz
+          sudo tar -xJf /tmp/zig.tar.xz -C /usr/local
+          sudo ln -sf /usr/local/zig-linux-x86_64-${ZIG_VERSION}/zig /usr/local/bin/zig
+          zig version
+
+      - name: Create zig CC wrappers
+        run: |
+          for pair in \
+            "x86_64-linux-musl:linux_amd64" \
+            "aarch64-linux-musl:linux_arm64" \
+            "x86_64-windows-gnu:windows_amd64" \
+            "aarch64-windows-gnu:windows_arm64"; do
+            target="${pair%%:*}"
+            name="${pair##*:}"
+            printf '#!/bin/sh\nexec zig cc -target %s "$@"\n' "$target" | sudo tee /usr/local/bin/zigcc_${name} > /dev/null
+            sudo chmod +x /usr/local/bin/zigcc_${name}
+          done
+
+      - name: Build linux/amd64
+        env:
+          GOOS: linux
+          GOARCH: amd64
+          CGO_ENABLED: '1'
+          CC: zigcc_linux_amd64
+        run: go build -mod=vendor -ldflags="-s -w" -o dnslogger_linux_amd64 .
+
+      - name: Build linux/arm64
+        env:
+          GOOS: linux
+          GOARCH: arm64
+          CGO_ENABLED: '1'
+          CC: zigcc_linux_arm64
+        run: go build -mod=vendor -ldflags="-s -w" -o dnslogger_linux_arm64 .
+
+      - name: Build windows/amd64
+        env:
+          GOOS: windows
+          GOARCH: amd64
+          CGO_ENABLED: '1'
+          CC: zigcc_windows_amd64
+        run: go build -mod=vendor -ldflags="-s -w" -o dnslogger_windows_amd64.exe .
+
+      - name: Build windows/arm64
+        env:
+          GOOS: windows
+          GOARCH: arm64
+          CGO_ENABLED: '1'
+          CC: zigcc_windows_arm64
+        run: go build -mod=vendor -ldflags="-s -w" -o dnslogger_windows_arm64.exe .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-windows
+          path: |
+            dnslogger_linux_amd64
+            dnslogger_linux_arm64
+            dnslogger_windows_amd64.exe
+            dnslogger_windows_arm64.exe
+
+  build-macos:
+    name: macOS
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          cache: false
+
+      - name: Create clang wrapper for x86_64
+        run: |
+          printf '#!/bin/sh\nexec clang -arch x86_64 "$@"\n' > /tmp/clang_x86_64
+          chmod +x /tmp/clang_x86_64
+          sudo mv /tmp/clang_x86_64 /usr/local/bin/clang_x86_64
+
+      - name: Build darwin/arm64
+        env:
+          GOOS: darwin
+          GOARCH: arm64
+          CGO_ENABLED: '1'
+        run: go build -mod=vendor -ldflags="-s -w" -o dnslogger_darwin_arm64 .
+
+      - name: Build darwin/amd64
+        env:
+          GOOS: darwin
+          GOARCH: amd64
+          CGO_ENABLED: '1'
+          CC: clang_x86_64
+        run: go build -mod=vendor -ldflags="-s -w" -o dnslogger_darwin_amd64 .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: |
+            dnslogger_darwin_arm64
+            dnslogger_darwin_amd64
+
+  release:
+    name: Release
+    needs: [build-linux-windows, build-macos]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dnslogger_linux_amd64
+            dnslogger_linux_arm64
+            dnslogger_windows_amd64.exe
+            dnslogger_windows_arm64.exe
+            dnslogger_darwin_amd64
+            dnslogger_darwin_arm64
+          generate_release_notes: true

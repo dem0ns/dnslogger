@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	_ "embed"
 	"flag"
 	"fmt"
 	"log"
@@ -11,6 +12,9 @@ import (
 
 	"github.com/miekg/dns"
 )
+
+//go:embed config.default.ini
+var defaultConfigFile []byte
 
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "simple" {
@@ -22,8 +26,20 @@ func main() {
 
 // --- Full Mode ---
 
+func generateDefaultConfig() {
+	const name = "config.default.ini"
+	if _, err := os.Stat(name); os.IsNotExist(err) {
+		if err := os.WriteFile(name, defaultConfigFile, 0644); err != nil {
+			log.Printf("[-] Failed to write %s: %v", name, err)
+		} else {
+			fmt.Printf("[*] Generated %s\n", name)
+		}
+	}
+}
+
 func runFullMode() {
 	fmt.Println("[+] DNSLogger Starting...")
+	generateDefaultConfig()
 
 	InitDB("dnslog.db")
 
